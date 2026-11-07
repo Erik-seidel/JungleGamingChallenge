@@ -1,6 +1,6 @@
 
 import { Money } from '../../wallet/domain/money';
-
+import { LedgerDirection } from '../../wallet/domain/ledger-direction';
 export enum WagerTransactionKind {
     OPENING = 'OPENING',
     BET = 'BET',
@@ -319,6 +319,48 @@ export class WagerTransaction {
 
     affectsBalance(): boolean {
         return this.state.kind !== WagerTransactionKind.LOSS;
+    }
+    ledgerDirectionFor(
+        reference?: WagerTransaction,
+    ): LedgerDirection {
+        switch (this.kind) {
+            case WagerTransactionKind.OPENING:
+            case WagerTransactionKind.WIN:
+            case WagerTransactionKind.REFUND:
+                return LedgerDirection.CREDIT;
+
+            case WagerTransactionKind.BET:
+                return LedgerDirection.DEBIT;
+
+            case WagerTransactionKind.LOSS:
+                throw new Error(
+                    'LOSS transaction does not generate a ledger entry',
+                );
+
+            case WagerTransactionKind.ROLLBACK:
+                if (!reference) {
+                    throw new Error(
+                        'ROLLBACK transaction requires a resolved reference',
+                    );
+                }
+
+                switch (reference.kind) {
+                    case WagerTransactionKind.BET:
+                        return LedgerDirection.CREDIT;
+
+                    case WagerTransactionKind.WIN:
+                    case WagerTransactionKind.REFUND:
+                        return LedgerDirection.DEBIT;
+
+                    case WagerTransactionKind.LOSS:
+                    case WagerTransactionKind.ROLLBACK:
+                        throw new Error(
+                            `Cannot rollback a ${reference.kind} transaction`,
+                        );
+                }
+        }
+
+        throw new Error('Unsupported transaction kind');
     }
 
     requiresReference(): boolean {

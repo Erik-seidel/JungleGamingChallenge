@@ -1,5 +1,6 @@
 
 import { Money } from '../../wallet/domain/money';
+import { LedgerDirection } from '../../wallet/domain/ledger-direction';
 import {
     WagerTransaction,
     WagerTransactionKind,
@@ -132,6 +133,205 @@ describe('WagerTransaction', () => {
                 transaction.reject('INSUFFICIENT_FUNDS'),
             ).toThrow();
         });
+        it.each([
+            [WagerTransactionStatus.PENDING, false],
+            [WagerTransactionStatus.PENDING_REFERENCE, false],
+            [WagerTransactionStatus.PROCESSED, true],
+            [WagerTransactionStatus.REJECTED, true],
+            [WagerTransactionStatus.FAILED, true],
+        ])('should identify %s as terminal: %s', (status, expected) => {
+            const transaction = WagerTransaction.rehydrate({
+                ...validProps,
+                status,
+                processedAt:
+                    status === WagerTransactionStatus.PROCESSED
+                        ? new Date('2026-11-07T13:00:00.000Z')
+                        : undefined,
+                failureCode:
+                    status === WagerTransactionStatus.REJECTED ||
+                        status === WagerTransactionStatus.FAILED
+                        ? 'TEST_ERROR'
+                        : undefined,
+            });
+
+            expect(transaction.isTerminal()).toBe(expected);
+        });
+    });
+    describe('affectsBalance', () => {
+        it.each([
+            [WagerTransactionKind.OPENING, true],
+            [WagerTransactionKind.BET, true],
+            [WagerTransactionKind.WIN, true],
+            [WagerTransactionKind.LOSS, false],
+            [WagerTransactionKind.REFUND, true],
+            [WagerTransactionKind.ROLLBACK, true],
+        ])('should identify %s balance impact', (kind, expected) => {
+            const transaction = WagerTransaction.create({
+                ...validProps,
+                kind,
+                referenceExternalTransactionId:
+                    kind === WagerTransactionKind.REFUND ||
+                        kind === WagerTransactionKind.ROLLBACK
+                        ? 'external-reference-1'
+                        : undefined,
+                money: kind === WagerTransactionKind.LOSS
+                    ? Money.zero('BRL')
+                    : validProps.money,
+            });
+
+            expect(transaction.affectsBalance()).toBe(expected);
+        });
     });
 
+    describe('requiresReference', () => {
+        it.each([
+            [WagerTransactionKind.OPENING, false],
+            [WagerTransactionKind.BET, false],
+            [WagerTransactionKind.WIN, false],
+            [WagerTransactionKind.LOSS, false],
+            [WagerTransactionKind.REFUND, true],
+            [WagerTransactionKind.ROLLBACK, true],
+        ])('should identify %s reference requirement', (kind, expected) => {
+            const transaction = WagerTransaction.create({
+                ...validProps,
+                kind,
+                referenceExternalTransactionId:
+                    kind === WagerTransactionKind.REFUND ||
+                        kind === WagerTransactionKind.ROLLBACK
+                        ? 'external-reference-1'
+                        : undefined,
+            });
+
+            expect(transaction.requiresReference()).toBe(expected);
+        });
+    });
+    describe('matchesPayload', () => {
+        it('should return true when payload hashes match', () => {
+            const transaction = WagerTransaction.create(validProps);
+
+            expect(transaction.matchesPayload('hash-123')).toBe(true);
+        });
+
+        it('should return false when payload hashes differ', () => {
+            const transaction = WagerTransaction.create(validProps);
+
+            expect(transaction.matchesPayload('different-hash')).toBe(false);
+        });
+    });
+    describe('ledgerDirectionFor', () => {
+        it.each([
+            [WagerTransactionKind.OPENING, LedgerDirection.CREDIT],
+            [WagerTransactionKind.BET, LedgerDirection.DEBIT],
+            [WagerTransactionKind.WIN, LedgerDirection.CREDIT],
+            [WagerTransactionKind.REFUND, LedgerDirection.CREDIT],
+        ])(
+            'should return %s ledger direction',
+            (kind, expectedDirection) => {
+                const transaction = WagerTransaction.create({
+                    ...validProps,
+                    kind,
+                    referenceExternalTransactionId:
+                        kind === WagerTransactionKind.REFUND
+                            ? 'external-reference-1'
+                            : undefined,
+                });
+
+                expect(transaction.ledgerDirectionFor()).toBe(
+                    expectedDirection,
+                );
+            },
+        );
+
+        it('should throw when kind is LOSS', () => {
+            const transaction = WagerTransaction.create({
+                ...validProps,
+                kind: WagerTransactionKind.LOSS,
+                money: Money.zero('BRL'),
+            });
+
+            expect(() => transaction.ledgerDirectionFor()).toThrow();
+        });
+
+        it.each([
+            [WagerTransactionKind.BET, LedgerDirection.CREDIT],
+            [WagerTransactionKind.WIN, LedgerDirection.DEBIT],
+            [WagerTransactionKind.REFUND, LedgerDirection.DEBIT],
+        ])(
+            'should return the correct direction when rolling back %s',
+            (referenceKind, expectedDirection) => {
+                const reference = WagerTransaction.create({
+                    ...validProps,
+                    id: 'reference-transaction',
+                    externalTransactionId: 'external-reference-1',
+                    kind: referenceKind,
+                    money:
+                        referenceKind === WagerTransactionKind.LOSS
+                            ? Money.zero('BRL')
+                            : validProps.money,
+                    referenceExternalTransactionId:
+                        referenceKind === WagerTransactionKind.REFUND ||
+                            referenceKind === WagerTransactionKind.ROLLBACK
+                            ? 'another-reference'
+                            : undefined,
+                });
+
+                const rollback = WagerTransaction.create({
+                    ...validProps,
+                    id: 'rollback-transaction',
+                    externalTransactionId: 'external-rollback-1',
+                    kind: WagerTransactionKind.ROLLBACK,
+                    referenceExternalTransactionId:
+                        reference.externalTransactionId,
+                });
+
+                expect(rollback.ledgerDirectionFor(reference)).toBe(
+                    expectedDirection,
+                );
+            },
+        );
+
+        it('should throw when ROLLBACK has no resolved reference', () => {
+            const rollback = WagerTransaction.create({
+                ...validProps,
+                kind: WagerTransactionKind.ROLLBACK,
+                referenceExternalTransactionId: 'external-reference-1',
+            });
+
+            expect(() => rollback.ledgerDirectionFor()).toThrow();
+        });
+
+        it.each([
+            WagerTransactionKind.LOSS,
+            WagerTransactionKind.ROLLBACK,
+        ])(
+            'should throw when ROLLBACK references an invalid kind: %s',
+            (referenceKind) => {
+                const reference = WagerTransaction.create({
+                    ...validProps,
+                    id: 'reference-transaction',
+                    externalTransactionId: 'external-reference-1',
+                    kind: referenceKind,
+                    money:
+                        referenceKind === WagerTransactionKind.LOSS
+                            ? Money.zero('BRL')
+                            : validProps.money,
+                    referenceExternalTransactionId:
+                        referenceKind === WagerTransactionKind.ROLLBACK
+                            ? 'another-reference'
+                            : undefined,
+                });
+
+                const rollback = WagerTransaction.create({
+                    ...validProps,
+                    kind: WagerTransactionKind.ROLLBACK,
+                    referenceExternalTransactionId:
+                        reference.externalTransactionId,
+                });
+
+                expect(() =>
+                    rollback.ledgerDirectionFor(reference),
+                ).toThrow();
+            },
+        );
+    });
 });
