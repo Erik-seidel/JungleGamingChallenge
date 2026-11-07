@@ -20,14 +20,14 @@ export enum WagerTransactionStatus {
 
 export interface CreateWagerTransactionProps {
     id: string;
-    providerId: string;
-    externalTransactionId: string;
-    idempotencyKey: string;
-    payloadHash: string;
+    providerId?: string;
+    externalTransactionId?: string;
+    idempotencyKey?: string;
+    payloadHash?: string;
     walletId: string;
     playerId: string;
-    roundId: string;
-    gameId: string;
+    roundId?: string;
+    gameId?: string;
     kind: WagerTransactionKind;
     money: Money;
     referenceExternalTransactionId?: string;
@@ -104,18 +104,35 @@ export class WagerTransaction {
     ): void {
         const requiredStrings = [
             props.id,
-            props.providerId,
-            props.externalTransactionId,
-            props.idempotencyKey,
-            props.payloadHash,
             props.walletId,
             props.playerId,
-            props.roundId,
-            props.gameId,
         ];
 
         if (
             requiredStrings.some(
+                (value) => typeof value !== 'string' || value.trim() === '',
+            )
+        ) {
+            throw new Error('Transaction contains invalid identifiers');
+        }
+
+        const externalMetadata = [
+            props.providerId,
+            props.externalTransactionId,
+            props.idempotencyKey,
+            props.payloadHash,
+            props.roundId,
+            props.gameId,
+        ];
+
+        if (props.kind === WagerTransactionKind.OPENING) {
+            if (externalMetadata.some((value) => value !== undefined)) {
+                throw new Error(
+                    'Opening transaction cannot contain provider metadata',
+                );
+            }
+        } else if (
+            externalMetadata.some(
                 (value) => typeof value !== 'string' || value.trim() === '',
             )
         ) {
@@ -166,19 +183,20 @@ export class WagerTransaction {
         return this.state.id;
     }
 
-    get providerId(): string {
+    get providerId(): string | undefined {
         return this.state.providerId;
     }
 
-    get externalTransactionId(): string {
+
+    get externalTransactionId(): string | undefined {
         return this.state.externalTransactionId;
     }
 
-    get idempotencyKey(): string {
+    get idempotencyKey(): string | undefined {
         return this.state.idempotencyKey;
     }
 
-    get payloadHash(): string {
+    get payloadHash(): string | undefined {
         return this.state.payloadHash;
     }
 
@@ -190,11 +208,11 @@ export class WagerTransaction {
         return this.state.playerId;
     }
 
-    get roundId(): string {
+    get roundId(): string | undefined {
         return this.state.roundId;
     }
 
-    get gameId(): string {
+    get gameId(): string | undefined {
         return this.state.gameId;
     }
 
@@ -371,7 +389,10 @@ export class WagerTransaction {
     }
 
     matchesPayload(payloadHash: string): boolean {
-        return this.state.payloadHash === payloadHash;
+        return (
+            this.state.payloadHash !== undefined &&
+            this.state.payloadHash === payloadHash
+        );
     }
 
 }

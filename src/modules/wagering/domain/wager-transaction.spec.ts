@@ -25,6 +25,16 @@ describe('WagerTransaction', () => {
         }),
         createdAt: new Date('2026-11-07T12:00:00.000Z'),
     };
+    const openingProps = {
+        ...validProps,
+        providerId: undefined,
+        externalTransactionId: undefined,
+        idempotencyKey: undefined,
+        payloadHash: undefined,
+        roundId: undefined,
+        gameId: undefined,
+        kind: WagerTransactionKind.OPENING,
+    };
 
     describe('create', () => {
         it('should create a transaction with PENDING status', () => {
@@ -38,6 +48,16 @@ describe('WagerTransaction', () => {
             expect(transaction.money.equals(validProps.money)).toBe(true);
         });
 
+        it('should reject internal OPENING transactions with provider metadata', () => {
+            expect(() =>
+                WagerTransaction.create({
+                    ...validProps,
+                    kind: WagerTransactionKind.OPENING,
+                }),
+            ).toThrow(
+                'Opening transaction cannot contain provider metadata',
+            );
+        });
         it('should reject REFUND without referenceExternalTransactionId', () => {
             expect(() =>
                 WagerTransaction.create({
@@ -65,6 +85,65 @@ describe('WagerTransaction', () => {
 
             expect(transaction.kind).toBe(WagerTransactionKind.LOSS);
             expect(transaction.money.isZero()).toBe(true);
+        });
+
+        it('should create an internal OPENING transaction without provider metadata', () => {
+            const transaction = WagerTransaction.create({
+                ...validProps,
+                providerId: undefined,
+                externalTransactionId: undefined,
+                idempotencyKey: undefined,
+                payloadHash: undefined,
+                roundId: undefined,
+                gameId: undefined,
+                kind: WagerTransactionKind.OPENING,
+            });
+
+            expect(transaction.kind).toBe(WagerTransactionKind.OPENING);
+            expect(transaction.providerId).toBeUndefined();
+            expect(transaction.externalTransactionId).toBeUndefined();
+            expect(transaction.idempotencyKey).toBeUndefined();
+            expect(transaction.payloadHash).toBeUndefined();
+            expect(transaction.roundId).toBeUndefined();
+            expect(transaction.gameId).toBeUndefined();
+        });
+
+        it.each([
+            ['providerId'],
+            ['externalTransactionId'],
+            ['idempotencyKey'],
+            ['payloadHash'],
+            ['roundId'],
+            ['gameId'],
+        ])('should reject external transactions without %s', (field) => {
+            expect(() =>
+                WagerTransaction.create({
+                    ...validProps,
+                    [field]: undefined,
+                }),
+            ).toThrow();
+        });
+    });
+
+    describe('rehydration', () => {
+        it('should restore an internal OPENING transaction without provider metadata', () => {
+            const transaction = WagerTransaction.rehydrate({
+                ...validProps,
+                providerId: undefined,
+                externalTransactionId: undefined,
+                idempotencyKey: undefined,
+                payloadHash: undefined,
+                roundId: undefined,
+                gameId: undefined,
+                kind: WagerTransactionKind.OPENING,
+                status: WagerTransactionStatus.PROCESSED,
+                processedAt: new Date('2026-11-07T13:00:00.000Z'),
+            });
+
+            expect(transaction.kind).toBe(WagerTransactionKind.OPENING);
+            expect(transaction.status).toBe(WagerTransactionStatus.PROCESSED);
+            expect(transaction.providerId).toBeUndefined();
+            expect(transaction.externalTransactionId).toBeUndefined();
         });
     });
 
@@ -167,7 +246,9 @@ describe('WagerTransaction', () => {
             [WagerTransactionKind.ROLLBACK, true],
         ])('should identify %s balance impact', (kind, expected) => {
             const transaction = WagerTransaction.create({
-                ...validProps,
+                ...(kind === WagerTransactionKind.OPENING
+                    ? openingProps
+                    : validProps),
                 kind,
                 referenceExternalTransactionId:
                     kind === WagerTransactionKind.REFUND ||
@@ -193,7 +274,9 @@ describe('WagerTransaction', () => {
             [WagerTransactionKind.ROLLBACK, true],
         ])('should identify %s reference requirement', (kind, expected) => {
             const transaction = WagerTransaction.create({
-                ...validProps,
+                ...(kind === WagerTransactionKind.OPENING
+                    ? openingProps
+                    : validProps),
                 kind,
                 referenceExternalTransactionId:
                     kind === WagerTransactionKind.REFUND ||
@@ -228,7 +311,9 @@ describe('WagerTransaction', () => {
             'should return %s ledger direction',
             (kind, expectedDirection) => {
                 const transaction = WagerTransaction.create({
-                    ...validProps,
+                    ...(kind === WagerTransactionKind.OPENING
+                        ? openingProps
+                        : validProps),
                     kind,
                     referenceExternalTransactionId:
                         kind === WagerTransactionKind.REFUND
