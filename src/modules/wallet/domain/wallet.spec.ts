@@ -23,6 +23,25 @@ describe('Wallet', () => {
             expect(wallet.balance.toString()).toBe('100.00');
             expect(wallet.version).toBe(1);
         });
+        it('should reject whitespace-only wallet id', () => {
+            expect(() =>
+                Wallet.open({
+                    id: '   ',
+                    playerId: 'player-123',
+                    initialBalance: createMoney('100.00'),
+                }),
+            ).toThrow('Wallet id and playerId are required');
+        });
+
+        it('should reject whitespace-only player id', () => {
+            expect(() =>
+                Wallet.open({
+                    id: 'wallet-123',
+                    playerId: '   ',
+                    initialBalance: createMoney('100.00'),
+                }),
+            ).toThrow('Wallet id and playerId are required');
+        });
 
         it('should create a wallet with zero balance', () => {
             const wallet = createWallet('0.00');

@@ -31,7 +31,7 @@ export class Wallet {
     static open(props: OpenWalletProps): Wallet {
         const { id, playerId, initialBalance } = props;
 
-        if (!id || !playerId) {
+        if (!id.trim() || !playerId.trim()) {
             throw new Error('Wallet id and playerId are required');
         }
 
