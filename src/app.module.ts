@@ -7,6 +7,8 @@ import { WalletOrmEntity } from './modules/wallet/infrastructure/persistence/wal
 import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { WalletLedgerEntryOrmEntity } from './modules/wallet/infrastructure/persistence/wallet-ledger-entry.orm-entity';
+import { WagerTransactionOrmEntity } from './modules/wagering/infrastructure/persistence/wager-transaction.orm-entity';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -27,7 +29,11 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
         dbName: configService.getOrThrow<string>('POSTGRES_DB'),
         user: configService.getOrThrow<string>('POSTGRES_USER'),
         password: configService.getOrThrow<string>('POSTGRES_PASSWORD'),
-        entities: [WalletOrmEntity],
+        entities: [
+          WalletOrmEntity,
+          WalletLedgerEntryOrmEntity,
+          WagerTransactionOrmEntity,
+        ],
         debug: true,
       }),
     }),
