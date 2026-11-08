@@ -1,126 +1,216 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Jungle Gaming Backend Challenge
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A transactional wagering backend built with NestJS, TypeScript, PostgreSQL, MikroORM, Bun, and SQS-compatible messaging.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This project focuses on financial correctness: exact monetary arithmetic, wallet concurrency control, idempotent transaction processing, an immutable ledger, and reliable event publication through the Transactional Outbox pattern.
 
-## Description
+Original challenge: https://github.com/junglegaming/backend-challenge
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Features
 
-## Project setup
+- Wallet management with balance and version tracking.
+- Wager processing for BET, WIN, LOSS, REFUND, and ROLLBACK.
+- Decimal.js for monetary arithmetic; no JavaScript floating-point calculations for money.
+- PostgreSQL transactions coordinated through a Unit of Work.
+- Business idempotency using provider-scoped idempotency keys and payload hashes.
+- Pessimistic wallet locking and optimistic version checks.
+- Immutable ledger entries for balance-changing operations.
+- Inbound SQS consumer for wager requests.
+- Transactional Outbox worker with retries and dead-letter queues.
+- Unit and integration tests.
 
-```bash
-$ bun install
-```
+## Stack
 
-## Compile and run the project
+| Area | Technology |
+|---|---|
+| Runtime / package manager | Bun |
+| Framework | NestJS 12 |
+| Language | TypeScript |
+| Database | PostgreSQL 17 |
+| ORM / migrations | MikroORM 7 |
+| Money | Decimal.js |
+| Messaging | AWS SDK for JavaScript v3 |
+| Local SQS-compatible broker | ElasticMQ |
+| Tests | Bun Test / Jest tooling |
 
-```bash
-# development
-$ bun run start
+## Architecture
 
-# watch mode
-$ bun run start:dev
+The application separates domain behavior, application use cases, and infrastructure adapters.
 
-# production mode
-$ bun run start:prod
-```
+- Wallet domain: money, wallet behavior, and ledger entries.
+- Wagering domain: transaction kinds, statuses, references, and state transitions.
+- Application layer: coordinates wager processing through a Unit of Work.
+- Persistence: MikroORM repositories and a transaction-scoped EntityManager.
+- Messaging: inbound SQS consumer, Outbox publisher, and background worker.
 
-## Run tests
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for component responsibilities and processing flows.
 
-```bash
-# unit tests
-$ bun run test
+## Local setup
 
-# e2e tests
-$ bun run test:e2e
+### Prerequisites
 
-# test coverage
-$ bun run test:cov
-```
+- Bun
+- Docker Desktop
+- Git
 
-## Deployment
+### 1. Install dependencies
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+    bun install
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 2. Configure environment
 
-```bash
-$ bun install -g @nestjs/mau
-$ mau deploy
-```
+Create a local .env file based on .env.example.
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+    POSTGRES_DB=jungle_gaming
+    POSTGRES_USER=jungle_user
+    POSTGRES_PASSWORD=jungle_dev_password
+    POSTGRES_PORT=5432
+    POSTGRES_HOST=localhost
 
-## Observability
+    SQS_ENDPOINT=http://localhost:9324
+    SQS_QUEUE_URL=http://localhost:9324/000000000000/jungle-events
+    SQS_WAGER_QUEUE_URL=http://localhost:9324/000000000000/wager-transactions.fifo
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+    AWS_REGION=us-east-1
+    AWS_ACCESS_KEY_ID=test
+    AWS_SECRET_ACCESS_KEY=test
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+The AWS credentials above are local placeholders for ElasticMQ. Do not use them with a real AWS account. Keep .env out of version control.
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+### 3. Start PostgreSQL and ElasticMQ
 
-This project is already instrumented. To connect it, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
+    docker compose up -d
 
-```bash
-$ npx @nestjs/observe link
-```
+| Service | Address | Purpose |
+|---|---|---|
+| PostgreSQL | localhost:5432 | Application database |
+| ElasticMQ | localhost:9324 | Local SQS-compatible broker |
 
-It writes the app key and secret into `.env` and makes every `nest start` script (`start`, `start:dev`, `start:debug`) load it. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
+### 4. Create the queues
 
-Or do it by hand: create an application and an API key at [observe.nestjs.com](https://observe.nestjs.com), and set the pair as `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment the app runs in.
+    bun run scripts/setup-sqs.ts
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+This creates the outbound standard queue and inbound FIFO queue, each with a dead-letter queue.
 
-## Resources
+### 5. Apply migrations
 
-Check out a few resources that may come in handy when working with NestJS:
+    bun run migration:up
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 6. Start the application
 
-## Support
+Development mode:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+    bun run start:dev
 
-## Stay in touch
+Standard mode:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+    bun run start
 
-## License
+The messaging module starts the inbound wager consumer and Outbox worker during application startup.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## Tests and build
+
+    bun test
+    bun run build
+
+Optional static analysis:
+
+    bun run lint
+
+## Inbound wager message
+
+The consumer expects this JSON envelope:
+
+~~~json
+{
+  "messageId": "unique-message-id",
+  "type": "WagerTransactionRequested",
+  "occurredAt": "2026-11-08T12:00:00.000Z",
+  "data": {
+    "providerId": "provider-1",
+    "externalTransactionId": "external-transaction-1",
+    "idempotencyKey": "idempotency-key-1",
+    "playerId": "player-uuid",
+    "walletId": "wallet-uuid",
+    "roundId": "round-1",
+    "gameId": "game-1",
+    "kind": "BET",
+    "money": {
+      "amount": "10.00",
+      "currency": "BRL"
+    }
+  }
+}
+~~~
+
+REFUND and ROLLBACK messages must also include referenceExternalTransactionId in data. Amounts are decimal strings to avoid precision loss.
+
+A local sample message can be sent with:
+
+    bun run scripts/send-test-wager.ts
+
+The helper uses a predefined wallet ID. Ensure that wallet exists and has sufficient funds before running the sample.
+
+## Transaction rules
+
+| Kind | Wallet effect | Reference |
+|---|---|---|
+| BET | Debit | Not required |
+| WIN | Credit | Not required |
+| LOSS | No balance change | Not required |
+| REFUND | Credit | Processed BET required |
+| ROLLBACK | Reverse referenced operation | Supported processed transaction required |
+
+Additional rules:
+
+- OPENING belongs to the wallet-opening flow and is not accepted by the wager-processing use case.
+- Debits that exceed the available balance are rejected.
+- A REFUND or ROLLBACK cannot be applied more than once for the same reference and operation kind.
+- An idempotent replay returns the persisted result instead of applying the financial operation again.
+
+## Messaging guarantees
+
+- Inbound messages are acknowledged after successful use-case completion.
+- Failed messages can be retried and eventually moved to the inbound dead-letter queue.
+- Outbox events are persisted in the same database transaction as the business operation.
+- Outbox delivery is at least once, not exactly once. Downstream consumers should deduplicate events using a stable event identifier.
+- ElasticMQ is used for local development. This project has not been validated against a live AWS account as part of local integration testing.
+
+## Main tables
+
+- wallets: current balance, currency, player ownership, and version.
+- wager_transactions: provider transaction identity, status, idempotency data, references, and resulting balance.
+- wallet_ledger_entries: immutable debit/credit records and before/after balances.
+- inbox_messages: consumed message identifiers and payload hashes.
+- outbox_events: events awaiting publication, retry metadata, and publication timestamp.
+
+## Project structure
+
+    src/
+      database/
+      modules/
+        shared/
+          application/
+            ports/
+            services/
+            workers/
+          infrastructure/
+            messaging/
+            persistence/
+        wallet/
+          application/
+          domain/
+          infrastructure/
+        wagering/
+          application/
+          domain/
+          infrastructure/
+    migrations/
+    scripts/
+    test/
+
+## Current boundaries
+
+- Wager commands currently enter through SQS; a public HTTP wager endpoint is not exposed.
+- ElasticMQ validates the local SQS integration path. AWS IAM, cloud deployment, and production infrastructure are outside the scope of this local setup.
+- Production use requires environment-specific secrets, IAM policies, queue configuration, monitoring, and operational alerting.
