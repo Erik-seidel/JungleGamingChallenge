@@ -1,15 +1,13 @@
-import { WalletModule } from './modules/wallet/wallet.module';
 import { Module } from '@nestjs/common';
-import { OutboxEventOrmEntity } from './modules/shared/infrastructure/persistence/outbox-event.orm-entity';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { PostgreSqlDriver } from '@mikro-orm/postgresql';
-import { WalletOrmEntity } from './modules/wallet/infrastructure/persistence/wallet.orm-entity';
+import { ConfigModule } from '@nestjs/config';
 import { createObserveModule } from '@nestjs/observe';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { WalletLedgerEntryOrmEntity } from './modules/wallet/infrastructure/persistence/wallet-ledger-entry.orm-entity';
-import { WagerTransactionOrmEntity } from './modules/wagering/infrastructure/persistence/wager-transaction.orm-entity';
+import { DatabaseModule } from './database/database.module';
+import { WalletModule } from './modules/wallet/wallet.module';
+import { WageringModule } from './modules/wagering/wagering.module';
+import { MessagingModule } from './modules/shared/infrastructure/messaging/messaging.module';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -18,29 +16,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-
-    MikroOrmModule.forRootAsync({
-      driver: PostgreSqlDriver,
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        host: configService.getOrThrow<string>('POSTGRES_HOST'),
-        port: Number(
-          configService.getOrThrow<string>('POSTGRES_PORT'),
-        ),
-        dbName: configService.getOrThrow<string>('POSTGRES_DB'),
-        user: configService.getOrThrow<string>('POSTGRES_USER'),
-        password: configService.getOrThrow<string>('POSTGRES_PASSWORD'),
-        entities: [
-          WalletOrmEntity,
-          WalletLedgerEntryOrmEntity,
-          WagerTransactionOrmEntity,
-          OutboxEventOrmEntity,
-        ],
-        debug: true,
-      }),
-    }),
-
+    DatabaseModule,
     WalletModule,
+    WageringModule,
+    MessagingModule,
     ObserveModule.forRoot({
       appKey: process.env.OBSERVE_APP_KEY ?? 'YOUR_APP_KEY',
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',

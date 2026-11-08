@@ -17,5 +17,13 @@ services:
       timeout: 5s
       retries: 5
 
+  elasticmq:
+    image: softwaremill/elasticmq-native:latest
+    container_name: jungle-elasticmq
+    restart: unless-stopped
+    ports:
+      - "9324:9324"
+
 volumes:
   postgres_data:
+  localstack_data:

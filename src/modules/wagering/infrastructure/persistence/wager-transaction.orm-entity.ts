@@ -51,7 +51,13 @@ export class WagerTransactionOrmEntity {
 
     @Property({ type: 'numeric', precision: 20, scale: 2 })
     amount!: string;
-
+    @Property({
+        type: 'numeric',
+        precision: 20,
+        scale: 2,
+        nullable: true,
+    })
+    balanceAfter?: string;
     @Property({ type: 'string', length: 3 })
     currency!: string;
 

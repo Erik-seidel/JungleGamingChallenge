@@ -25,6 +25,7 @@
     "migration:pending": "mikro-orm migration:pending"
   },
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.1164.0",
     "@mikro-orm/core": "^7",
     "@mikro-orm/decorators": "^7",
     "@mikro-orm/migrations": "^7",

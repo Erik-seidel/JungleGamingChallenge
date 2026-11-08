@@ -7,7 +7,7 @@ export interface WalletRepository {
         playerId: string,
         currency: string,
     ): Promise<Wallet | null>;
-
+    findByIdForUpdate(id: string): Promise<Wallet | null>;
     create(wallet: Wallet): Promise<void>;
 
     update(

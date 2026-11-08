@@ -65,7 +65,7 @@ export class OpenWalletUseCase {
                 createdAt: now,
             });
 
-            transaction.markProcessed(undefined, now);
+            transaction.markProcessed(undefined, now, initialBalance);
 
             await repositories.wagerTransactions.create(transaction);
 

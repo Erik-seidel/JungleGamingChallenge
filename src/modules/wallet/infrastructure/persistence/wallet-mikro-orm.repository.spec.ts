@@ -1,5 +1,5 @@
 ﻿import { EntityManager } from '@mikro-orm/postgresql';
-
+import { LockMode } from '@mikro-orm/core';
 import { Money } from '../../domain/money';
 import { Wallet } from '../../domain/wallet';
 import { WalletOrmEntity } from './wallet.orm-entity';
@@ -55,6 +55,24 @@ describe('WalletMikroOrmRepository', () => {
             const result = await repository.findById('wallet-404');
 
             expect(result).toBeNull();
+        });
+    });
+    describe('findByIdForUpdate', () => {
+        it('should find a wallet using a pessimistic write lock', async () => {
+            entityManager.findOne.mockResolvedValue(walletEntity);
+
+            const result = await repository.findByIdForUpdate('wallet-1');
+
+            expect(entityManager.findOne).toHaveBeenCalledWith(
+                WalletOrmEntity,
+                { id: 'wallet-1' },
+                {
+                    lockMode: LockMode.PESSIMISTIC_WRITE,
+                },
+            );
+
+            expect(result).toBeInstanceOf(Wallet);
+            expect(result?.id).toBe('wallet-1');
         });
     });
 

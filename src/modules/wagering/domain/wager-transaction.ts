@@ -40,6 +40,7 @@ export interface WagerTransactionState
     referenceTransactionId?: string;
     failureCode?: string;
     processedAt?: Date;
+    balanceAfter?: Money;
 }
 
 export class WagerTransaction {
@@ -48,15 +49,19 @@ export class WagerTransaction {
     ) {
         this.state = {
             ...state,
+            balanceAfter: state.balanceAfter
+                ? Money.from({
+                    amount: state.balanceAfter.toString(),
+                    currency: state.balanceAfter.currency,
+                })
+                : undefined,
             createdAt: new Date(state.createdAt),
             processedAt: state.processedAt
                 ? new Date(state.processedAt)
                 : undefined,
         };
 
-
         Object.freeze(this);
-
     }
 
     static create(
@@ -187,6 +192,9 @@ export class WagerTransaction {
         return this.state.providerId;
     }
 
+    get balanceAfter(): Money | undefined {
+        return this.state.balanceAfter;
+    }
 
     get externalTransactionId(): string | undefined {
         return this.state.externalTransactionId;
@@ -268,6 +276,7 @@ export class WagerTransaction {
     markProcessed(
         referenceTransactionId: string | undefined,
         at: Date,
+        balanceAfter: Money,
     ): void {
         this.ensureNonTerminal();
         this.ensurePending();
@@ -275,7 +284,12 @@ export class WagerTransaction {
         if (!WagerTransaction.isValidDate(at)) {
             throw new Error('Invalid processedAt date');
         }
-
+        if (
+            !(balanceAfter instanceof Money) ||
+            balanceAfter.currency !== this.state.money.currency
+        ) {
+            throw new Error('Invalid resulting balance');
+        }
         if (
             referenceTransactionId !== undefined &&
             (typeof referenceTransactionId !== 'string' ||
@@ -287,23 +301,34 @@ export class WagerTransaction {
         this.state.status = WagerTransactionStatus.PROCESSED;
         this.state.referenceTransactionId = referenceTransactionId;
         this.state.processedAt = new Date(at);
+        this.state.balanceAfter = balanceAfter;
     }
 
-    markPendingReference(): void {
-        this.ensureNonTerminal();
-
-        if (this.state.status !== WagerTransactionStatus.PENDING) {
-            throw new Error('Invalid transaction state transition');
+    markPendingReference(balanceAfter: Money): void {
+        if (
+            this.state.kind !== WagerTransactionKind.REFUND &&
+            this.state.kind !== WagerTransactionKind.ROLLBACK
+        ) {
+            throw new Error(
+                'Only REFUND and ROLLBACK can have pending references',
+            );
         }
 
-        if (!this.requiresReference()) {
-            throw new Error('Transaction does not require a reference');
+        if (this.state.status !== WagerTransactionStatus.PENDING) {
+            throw new Error(
+                'Only pending transactions can wait for a reference',
+            );
+        }
+
+        if (balanceAfter.currency !== this.state.money.currency) {
+            throw new Error('Balance currency mismatch');
         }
 
         this.state.status = WagerTransactionStatus.PENDING_REFERENCE;
+        this.state.balanceAfter = balanceAfter;
     }
 
-    reject(code: string): void {
+    reject(code: string, balanceAfter: Money): void {
         this.ensureNonTerminal();
         this.ensurePending();
 
@@ -311,8 +336,16 @@ export class WagerTransaction {
             throw new Error('Invalid failure code');
         }
 
+        if (
+            !(balanceAfter instanceof Money) ||
+            balanceAfter.currency !== this.state.money.currency
+        ) {
+            throw new Error('Balance currency mismatch');
+        }
+
         this.state.status = WagerTransactionStatus.REJECTED;
         this.state.failureCode = code;
+        this.state.balanceAfter = balanceAfter;
     }
 
     fail(code: string): void {

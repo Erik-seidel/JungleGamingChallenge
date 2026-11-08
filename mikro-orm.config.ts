@@ -4,7 +4,10 @@ import {
     defineConfig,
     PostgreSqlDriver,
 } from '@mikro-orm/postgresql';
-
+import { WalletLedgerEntryOrmEntity } from './src/modules/wallet/infrastructure/persistence/wallet-ledger-entry.orm-entity';
+import { WagerTransactionOrmEntity } from './src/modules/wagering/infrastructure/persistence/wager-transaction.orm-entity';
+import { OutboxEventOrmEntity } from './src/modules/shared/infrastructure/persistence/outbox-event.orm-entity';
+import { InboxMessageOrmEntity } from './src/modules/shared/infrastructure/persistence/inbox-message.orm-entity';
 import { WalletOrmEntity } from './src/modules/wallet/infrastructure/persistence/wallet.orm-entity';
 
 function requiredEnv(name: string): string {
@@ -26,7 +29,12 @@ export default defineConfig({
     user: requiredEnv('POSTGRES_USER'),
     password: requiredEnv('POSTGRES_PASSWORD'),
 
-    entities: [WalletOrmEntity],
+    entities: [
+        WalletOrmEntity,
+        WalletLedgerEntryOrmEntity,
+        WagerTransactionOrmEntity,
+        OutboxEventOrmEntity,
+    ],
 
     extensions: [Migrator],
 

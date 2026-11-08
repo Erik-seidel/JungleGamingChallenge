@@ -17,6 +17,8 @@ describe('OpenWalletUseCase', () => {
             },
             wagerTransactions: {
                 create: mock(async () => { }),
+                findByProviderAndIdempotencyKey: mock(async () => null),
+                findByProviderAndExternalTransactionId: mock(async () => null),
             },
             ledgerEntries: {
                 create: mock(async () => { }),
@@ -64,6 +66,12 @@ describe('OpenWalletUseCase', () => {
         expect(wallet).toBeInstanceOf(Wallet);
         expect(repositories.wallets.create).toHaveBeenCalledTimes(1);
         expect(repositories.wagerTransactions.create).toHaveBeenCalledTimes(1);
+
+        const openingTransaction =
+            repositories.wagerTransactions.create.mock.calls[0][0];
+
+        expect(openingTransaction.balanceAfter?.toString()).toBe('100.00');
+
         expect(repositories.ledgerEntries.create).toHaveBeenCalledTimes(1);
         expect(repositories.outbox.enqueue).toHaveBeenCalledTimes(2);
 

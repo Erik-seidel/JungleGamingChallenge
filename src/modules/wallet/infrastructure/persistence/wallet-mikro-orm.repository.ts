@@ -4,6 +4,7 @@ import { Money } from '../../domain/money';
 import { Wallet } from '../../domain/wallet';
 import { WalletRepository } from '../../application/ports/wallet.repository';
 import { WalletOrmEntity } from './wallet.orm-entity';
+import { LockMode } from '@mikro-orm/core';
 
 export class WalletMikroOrmRepository implements WalletRepository {
     constructor(
@@ -14,6 +15,18 @@ export class WalletMikroOrmRepository implements WalletRepository {
         const entity = await this.entityManager.findOne(
             WalletOrmEntity,
             { id },
+        );
+
+        return entity ? this.toDomain(entity) : null;
+    }
+
+    async findByIdForUpdate(id: string): Promise<Wallet | null> {
+        const entity = await this.entityManager.findOne(
+            WalletOrmEntity,
+            { id },
+            {
+                lockMode: LockMode.PESSIMISTIC_WRITE,
+            },
         );
 
         return entity ? this.toDomain(entity) : null;
