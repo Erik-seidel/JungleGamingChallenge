@@ -6,8 +6,6 @@ import {
 } from '@mikro-orm/postgresql';
 
 import { WalletOrmEntity } from './src/modules/wallet/infrastructure/persistence/wallet.orm-entity';
-import { WalletLedgerEntryOrmEntity } from './src/modules/wallet/infrastructure/persistence/wallet-ledger-entry.orm-entity';
-import { WagerTransactionOrmEntity } from './src/modules/wagering/infrastructure/persistence/wager-transaction.orm-entity';
 
 function requiredEnv(name: string): string {
     const value = process.env[name];
@@ -28,11 +26,7 @@ export default defineConfig({
     user: requiredEnv('POSTGRES_USER'),
     password: requiredEnv('POSTGRES_PASSWORD'),
 
-    entities: [
-        WalletOrmEntity,
-        WalletLedgerEntryOrmEntity,
-        WagerTransactionOrmEntity,
-    ],
+    entities: [WalletOrmEntity],
 
     extensions: [Migrator],
 

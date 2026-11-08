@@ -1,5 +1,6 @@
-
+import { WalletModule } from './modules/wallet/wallet.module';
 import { Module } from '@nestjs/common';
+import { OutboxEventOrmEntity } from './modules/shared/infrastructure/persistence/outbox-event.orm-entity';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
@@ -33,11 +34,13 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
           WalletOrmEntity,
           WalletLedgerEntryOrmEntity,
           WagerTransactionOrmEntity,
+          OutboxEventOrmEntity,
         ],
         debug: true,
       }),
     }),
 
+    WalletModule,
     ObserveModule.forRoot({
       appKey: process.env.OBSERVE_APP_KEY ?? 'YOUR_APP_KEY',
       appSecret: process.env.OBSERVE_APP_SECRET ?? 'YOUR_APP_SECRET',
